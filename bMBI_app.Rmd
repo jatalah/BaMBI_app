@@ -1,0 +1,121 @@
+---
+title: "baMBI calculator"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(tidyverse)
+library(DT)
+conflict_prefer("renderDataTable", "shiny")
+
+# Load helper functions ----
+source('helper_functions.R')
+
+# read the Eco-Groups file-------
+eg <- read_csv('eg_groups.csv', show_col_types = FALSE)
+
+dataset <- 
+  eventReactive(input$file1,{
+      dataset <- read_tsv(input$file1$datapath, show_col_types = FALSE)
+    })
+```
+
+## Column {data-width="250"}
+
+### Data upload
+
+```{r}
+
+fileInput("file1", "Choose ASV table file",
+                multiple = TRUE,
+                accept = c("text/csv",
+                         "text/comma-separated-values,text/plain",
+                         ".csv"))
+helpText(
+  HTML(
+    '<p style="font-size: 11pt">
+              <ul>
+  <li>Samples must be as columns and ASV as rows</li>
+  <li>The first column must be named <b>feature-id</b> </li>
+  </ul>
+              </p>'
+  )
+)
+br()
+helpText(HTML('<p style="font-size: 11pt"> Wait for a few seconds for the results ....             </p>'))
+
+helpText(HTML('<a href="mailto:javier.atalah@cawthron.org.nz"> Email for troble shooting</a>'))
+
+img(src = "caw.webp",
+    height = 75,
+    width = 300)
+
+br()
+br()
+br()
+
+
+img(src = "Bambi_-_Render.png",
+    height = 300,
+    width = 250)
+
+
+```
+
+## Column {data-width="500"}
+
+### Results
+
+```{r}
+helpText(
+  HTML(
+    '<p style="font-size: 11pt">
+                          <ul>
+  <li> <b>percent_assign column</b> is the percentage of ASVs assigned to an Eco-group  </li>
+  <li>  <b> to VI </b> is the proportion of ASV assigned to each of Eco-Groups </li>
+  <li> <b>bMBI</B> are the index values </li>
+
+  </ul>
+                </p>'
+  )
+)
+
+helpText(
+  HTML(
+    '<p style="font-size: 11pt"> Use the buttons below to save results as csv or excel, or to copied them to your clipboard </p>'
+  )
+)
+
+
+renderDataTable({
+  data <- dataset() %>%
+    rename(ASV = 'feature-id') %>% # rename if first to 'ASV'
+    mutate_at(vars(-ASV),  ~ if_else(. > 0, 1, 0))
+ 
+eg_prop <- eg_prop_calc(data = data, eg = eg)
+
+# Calculate the bMBI index and save the data -----
+bMBI_data <-  
+  MBI_calc(eg_prop_data = eg_prop, weights = weights) %>% 
+  write_csv('my_bMBI_data.csv') 
+
+bMBI_data %>%
+  datatable(
+    extensions = 'Buttons',
+    options = list(
+      dom = 'Blfrtip',
+      buttons = c('csv', 'excel', 'copy'),
+      lengthMenu = list(c(-1, 10, 25, 50),
+                        c("All", 10, 25, 50))
+    )
+  ) %>%
+  formatRound(columns = c(2:9), digits = 2)
+})
+
+```
